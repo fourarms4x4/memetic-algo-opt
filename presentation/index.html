@@ -24,6 +24,7 @@ p {
 
 body {
   background-color: #020617; /* Slate-950 */
+  counter-reset: slide;
   display: grid;
   gap: 20px;
   grid-template-columns: 1fr;
@@ -38,6 +39,7 @@ body {
   background-color: #0f172a; /* Slate-900 */
   border-radius: 8px;
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+  counter-increment: slide;
   display: flex;
   flex-direction: column;
   font-family: 'Inter', sans-serif;
@@ -47,6 +49,19 @@ body {
   padding: 60px;
   position: relative;
   width: 1280px;
+}
+
+/* Slide number in top-right corner */
+.slide-container::after {
+  color: #475569;
+  content: counter(slide) " / 20";
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  position: absolute;
+  right: 25px;
+  top: 18px;
+  z-index: 10;
 }
 
 /* 1.1 BACKGROUND STYLING */
