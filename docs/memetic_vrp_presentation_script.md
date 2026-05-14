@@ -207,13 +207,13 @@
 
 > "Why a memetic algorithm specifically for VRP? Two reasons.
 
-> First, the VRP search space is enormous and rugged — lots of local optima. A pure genetic algorithm would explore broadly but converge too slowly. Pure local search would get stuck in the first decent solution it finds.
+> First, the VRP search space is enormous and rugged — lots of local optima. Think of it like a mountain range with thousands of peaks. A pure genetic algorithm would explore broadly but converge too slowly — it'd find the general region of the high peaks but never quite reach any summit. Pure local search would climb the nearest hill and stop, even if a much bigger mountain is nearby. Neither alone is sufficient.
 
-> A memetic algorithm does both: the GA **explores** globally, the local search **exploits** locally. This dual approach is why Moscato coined the term in 1989 — memes evolve culturally through learning, just like we refine solutions through local search, on top of the biological evolution from crossover and mutation.
+> A memetic algorithm does both: the GA **explores** globally, the local search **exploits** locally. The GA jumps between regions; the local search climbs each region to its precise peak. Together they find both the right mountain and the exact summit. Moscato coined the term in 1989 — memes evolve culturally through learning, just like we refine solutions through local search, on top of the biological evolution from crossover and mutation.
 
 > **[Point to diagram]** Here's our architecture. Left side: the GA loop — a population of 60 solutions, tournament selection, Order Crossover, and three mutation types. Right side: the local search — five VRP-specific operators that refine promising offspring.
 
-> Key features: we encode solutions as **giant tours** decoded by **Prins' split algorithm**, apply local search to 15% of the population each generation, preserve elite solutions, and inject random diversity when stagnation is detected.
+> Key features: we encode solutions as **giant tours** decoded by **Prins' split algorithm**, apply local search to 15% of the population each generation, preserve elite solutions via elitism, and inject random diversity when stagnation is detected.
 
 > This runs for 150 generations. Let me break down each component."
 
@@ -237,7 +237,9 @@
 
 > **[Point to diagram Step 1]** Our approach uses a **giant tour** — a simple permutation of all 35 customers. Think of it as a shuffled deck of cards. Each card is a customer ID. The order in the deck matters — customers early in the list tend to end up on earlier routes.
 
-> **[Point to Step 2]** But a single list doesn't say where one vehicle stops and the next begins. That's where **Prins' Split Algorithm** comes in. Prins, in 2004, showed how to partition a giant tour into feasible routes optimally. It builds a directed acyclic graph and finds the shortest path — splitting the tour wherever capacity allows, minimizing total distance.
+> **[Point to Step 2]** But a single list doesn't say where one vehicle stops and the next begins. That's where **Prins' Split Algorithm** comes in. Prins showed in 2004 how to partition a giant tour into feasible routes optimally. Here's how: it builds a graph with 36 nodes (0 to 35, representing positions in the giant tour). For every pair i < j, it asks: can customers at positions i+1 through j fit in one vehicle? If yes, it adds an edge with the route cost as its weight. Then it finds the shortest path from node 0 to node 35 using dynamic programming — this is exactly like finding the cheapest way to cut the giant tour into pieces, where each piece is a feasible route.
+
+> The cost of a single edge is this: depot to first customer, then customer-to-customer for each consecutive pair in the segment, then last customer back to depot. The DP algorithm is O(N²), which for 35 customers means about 1,225 edge checks — trivial computation.
 
 > **[Point to Step 3]** The output is a set of colored routes. Each route starts and ends at the depot, doesn't exceed capacity, and collectively visits every customer.
 
@@ -261,9 +263,11 @@
 
 > "Order Crossover, or OX, combines two parent giant tours into a child. It operates directly on the permutation — no routes, no vehicles, just the visit order.
 
+> Why OX specifically? Standard one-point or two-point crossover doesn't work for permutations — they'd create duplicate customers and lose others. You'd end up with a route that says 'visit customer 3 twice, customer 7 zero times.' That's invalid for VRP. OX is designed to avoid this — it preserves all customers exactly once.
+
 > Here's how it works. **[Walk through the 4 steps on screen]**
 
-> **Step 1:** Take a random contiguous segment from Parent 1 — say, customers 3, 4, 5 in positions 2 through 4. That swath gets copied directly to the child.
+> **Step 1:** Take a random contiguous segment from Parent 1 — say, customers 3, 4, 5 in positions 2 through 4. That swath gets copied directly to the child. This preserves the **relative adjacency** of these customers — because in a good solution, nearby customers in the permutation tend to be served by the same vehicle.
 
 > **Step 2:** Now look at Parent 2's sequence: 7, 6, 5, 4, 3, 2, 1. We're going to use this to fill the gaps.
 
@@ -271,7 +275,7 @@
 
 > **Step 4:** Starting from the right cut point, read Parent 2 in order — 7, 6, 2, 1. Skip 5, 4, 3 because they're already in the child. Fill the blanks. Result: [2, 1, 3, 4, 5, 7, 6].
 
-> The child inherits the **structure** of Parent 1's swath and the **relative order** of Parent 2. No customer appears twice, none are lost. This is the standard OX operator, applied to our giant tour encoding."
+> The child inherits the **contiguous structure** of Parent 1's swath and the **relative order** of Parent 2. No customer appears twice, none are lost. This preserves valid permutations — every customer appears exactly once in the child."
 
 ---
 
@@ -289,20 +293,22 @@
 
 **SAY:**
 
-> "This is the heart of the memetic algorithm. Each generation, 15% of offspring go through an intensive local search pipeline using five operators. All of them use **delta evaluation** — we compute only the marginal change in cost, not the full route. This gives a 3-10x speedup.
+> "This is the heart of the memetic algorithm. Each generation, 15% of offspring go through an intensive local search pipeline using five operators.
 
-> The operators split into two categories:
+> Let me explain what makes these operators fast — **delta evaluation**. Normally, evaluating a move would mean recomputing the full route distance from scratch — summing all edge costs along the route, O(L) per evaluation. With 35 customers and hundreds of move checks per individual, this gets expensive.
 
-> **[Point to top row of diagram] Intra-route** — these work inside a single vehicle's route:
-> - **2-opt:** if a route crosses itself — like tangled headphones — 2-opt reverses the middle segment to uncross it. Crossed routes always waste distance for Euclidean problems.
-> - **Or-opt:** takes a short segment of 2-3 consecutive customers and relocates it to a better position within the same route. Sometimes visiting that cluster earlier or later saves distance.
+> Delta evaluation computes only the **change** in cost. For example, relocating customer X from route A to route B: instead of recomputing both 9-customer routes fully, we compute: new cost of A = old A minus edges involving X plus the new connection that bridges the gap. New cost of B = old B plus edges involving X at the insertion point minus the edges that get broken. This is O(1) per move instead of O(L). It gives a 3-10x speedup — which is what brought our runtime from 162 seconds to 55.
+
+> **[Point to top row of diagram]** The operators split into two categories. **Intra-route** — these work inside a single vehicle's route:
+> - **2-opt:** tries reversing every possible subtour segment. If the reversal shortens the route, it's kept. 2-opt explores the '2-exchange' neighborhood — every pair of edges that could be swapped. For a route of length 9, that's about 28 pairs to check. A single pass removes the most obvious crossings, and repeating it converges to the optimal 2-opt solution — a locally shortest route with no crossings.
+> - **Or-opt:** takes a short segment of 2-3 consecutive customers and tests moving it to every other position within the route. It's like asking: 'would these three customers be better served earlier or later in this trip?' Or-opt explores a larger neighborhood than 2-opt, so it can find improvements 2-opt misses.
 
 > **[Point to bottom row of diagram] Inter-route** — these move work between different vehicles:
-> - **Relocate:** moves one customer from its current route to a different vehicle, trying every valid insertion point. This balances load across the fleet.
-> - **Exchange:** swaps two customers between two different routes — mutually beneficial reassignment.
-> - **2-opt\*:** splits two routes at chosen points and cross-connects them. Effectively trades the tail sections of two routes. This is one of the most powerful moves in VRP local search.
+> - **Relocate:** tries moving each customer from its current route to every possible insertion point in every other route. Only accepts moves that don't violate capacity. This is the most intuitive operator — rebalancing load.
+> - **Exchange:** swaps two customers between two different routes. The mutual swap neighborhood is larger than relocate — for each pair of routes, it checks every customer-on-customer combination, about 9×9 = 81 swaps for two average routes.
+> - **2-opt\*:** splits two routes at every possible pair of cut points and cross-connects them. This creates the largest structural change — effectively redesigning the boundary between two vehicle territories. It's one of the most powerful moves but also the most expensive: about 10×10 = 100 cut combinations per route pair.
 
-> These five operators run in sequence — intra-route first, then inter-route — for up to three cycles or until no improvement is found. The pipeline covers the complete neighborhood of meaningful VRP modifications."
+> These five operators run in sequence — intra-route first (cheaper, refines individual routes), then inter-route (more expensive, reshapes the fleet). The cycle repeats up to three times or until no operator can find an improvement. The combined neighborhood covers every meaningful modification to a VRP solution — no single operator could cover all these cases alone."
 
 ---
 
@@ -328,17 +334,17 @@
 
 > "Each generation follows this cycle:
 
-> **Step 1 — Evaluate:** Compute fitness for all 60 individuals via Prins Split. Fitness equals total distance plus a penalty for any capacity violation.
+> **Step 1 — Evaluate:** Compute fitness for all 60 individuals via Prins Split. Fitness equals total distance of all decoded routes plus a penalty for capacity violations. The penalty formula is: 1,000 plus 5 times the generation number, multiplied by the total overload. So at generation 0, the penalty is 1,000 per unit of overload. At generation 150, it's 1,750. This starts soft to allow exploration of interesting but slightly overloaded solutions, and gradually hardens to enforce strict feasibility by the end.
 
-> **Step 2 — Select and Breed:** Tournament selection picks parents. Order Crossover produces offspring. Then mutation — swap, inversion, or displacement — adds random variation 15% of the time.
+> **Step 2 — Select and Breed:** Tournament selection picks parents. Here's how: randomly grab 3 individuals from the population, pick the one with the shortest total distance. Do this twice to get two parents. This is called tournament size 3 — selective enough that fitter individuals reproduce more often, but not so selective that diversity collapses. Then Order Crossover combines them to produce offspring. After crossover, mutation adds random variation. We have three mutation types applied 15% of the time total: **swap mutation** exchanges two random customers in the tour. **Inversion mutation** reverses a random subsequence — this is useful because reversal in the giant tour corresponds to reversing a segment of a vehicle's route, which 2-opt would normally need to discover. **Displacement mutation** cuts a subsequence and reinserts it elsewhere — this can move a cluster of customers from one vehicle to another.
 
-> **Step 3 — Local Search:** 15% of offspring undergo the full five-operator pipeline. This is the memetic refinement.
+> **Step 3 — Local Search:** 15% of offspring undergo the full five-operator pipeline. These are the 9 or so offspring that are promising but not yet locally optimal. The local search polishes them until every operator finds no further improvement.
 
-> **Step 4 — Elitism:** The top 2 solutions are preserved unchanged to the next generation.
+> **Step 4 — Elitism:** The top 2 solutions are preserved unchanged to the next generation. Without elitism, the best solution could be lost if crossover happens to recombine it poorly. With elitism, we guarantee monotonic improvement — the best fitness never gets worse.
 
-> **Step 5 — Diversity Injection:** If 25 generations pass with no fitness improvement, 20% of the population is replaced with completely random tours — fresh blood to escape plateaus.
+> **Step 5 — Diversity Injection:** If 25 generations pass with no fitness improvement, 20% of the population (except the elites) is replaced with completely random giant tours. This is a hard reset that prevents the GA from wasting compute on a converged, identical population. The random tours are then exposed to local search in subsequent generations, which pulls them toward whatever local optimum they're nearest to. Occasionally one of these injections finds a better basin than the current one.
 
-> **[Point to convergence image]** The right panel shows the result. The blue line is the best fitness — notice the dramatic drop in the first 30 generations, from 1,246 to 514. That's a 58.7% improvement. After that, the algorithm plateaus — it's found a deep local optimum that even diversity injection can't escape."
+> **[Point to convergence image]** The right panel shows the result. The blue line is the best fitness — notice the dramatic drop in the first 30 generations, from 1,246 to 514. That's a 58.7% improvement. After that, the algorithm plateaus — it's found a deep local optimum that even diversity injection can't escape. The orange line is the average population fitness — notice the periodic spikes near generations 47, 72, 97, and 122. Those are from diversity injection: random tours are much worse on average, so the average jumps up, then the local search pulls them back down."
 
 ---
 
@@ -382,13 +388,13 @@
 
 > "Four innovations worth highlighting:
 
-> **Delta evaluation:** Instead of recomputing full route costs for every move, we compute only the difference — old minus new. This alone speeds up local search by 3 to 10 times. It's what took our runtime from 162 seconds to 55.
+> **Delta evaluation:** Instead of recomputing full route costs for every move, we compute only the difference — old minus new. For the exchange operator, this means checking 4 distances instead of recomputing two routes of 9 nodes each: 4 operations versus 18. For relocate, it's 3 distance lookups for the delta versus 8 for a full route cost. Across thousands of move checks per generation, these O(1) savings compound to a 3-10x speedup — the difference between a 162-second runtime and a 55-second one.
 
-> **Adaptive penalty:** Capacity violation penalties start at 1000 and increase by 5 per generation. Early on, the algorithm can explore slightly infeasible regions. Later, the penalty forces strict feasibility. This balances exploration and constraint satisfaction.
+> **Adaptive penalty:** The penalty function is λ(g) = 1,000 + 5g, where g is the generation number. At generation 0, λ = 1,000 — an overcapacity of 1 unit adds 1,000 distance units to the fitness. This is strict enough to discourage infeasibility but not so strict that it blocks exploration. At generation 150, λ = 1,750 — nearly double, forcing solutions toward strict feasibility. The linear increase means the algorithm naturally transitions from 'find promising regions' early on to 'deliver a valid solution' by the end.
 
-> **Diversity injection:** Stagnation detection with automatic population refresh. If nothing improves for 25 generations, we replace 20% of the population. This prevents wasted computation and occasionally finds better solutions.
+> **Diversity injection:** Stagnation detection with automatic population refresh. We track how many generations pass since the best fitness last improved. When that counter hits 25, we replace 12 out of 60 individuals (the bottom 20%, excluding the 2 elite solutions) with completely new random permutations. The random tours are then exposed to local search in subsequent generations. You can see this on the convergence curve as periodic spikes in the average fitness — the average jumps when random tours enter, then drops as local search refines them. Without this mechanism, the population would converge to identical clones by generation 40, wasting 110 generations of compute.
 
-> **Prins Split decoding:** Clean separation of concerns — the GA works on simple permutations, the split handles all routing and capacity logic. This makes the algorithm extensible to other VRP variants by changing only the decoder."
+> **Prins Split decoding:** Clean separation of concerns — the GA operates on simple 1D permutations, the split handles all VRP complexity: multiple vehicles, capacity constraints, route distance computation. This separation means you can extend the framework to new VRP variants by changing only the decoder. Want to add time windows? Modify the split algorithm to penalize late arrivals, keep the GA unchanged. Want to add multiple depots? Change the split to assign customers to the nearest depot. The encoding is the hard part in evolutionary computation — Prins' insight was that fixing a good encoding makes everything else tractable."
 
 ---
 
