@@ -1,0 +1,1085 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimizing the Last Mile - VRP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- MathJax for rendering LaTeX formulas -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+/* 1. THE SETUP */
+
+* {
+  box-sizing: border-box;
+}
+
+/* Normalize margins for paragraphs to ovrride browser defaults. */
+p {
+  margin: 0;
+  margin-bottom: 15px;
+}
+
+body {
+  background-color: #020617; /* Slate-950 */
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr;
+  margin: 0;
+  min-height: 100vh;
+  padding: 20px 0;
+  place-items: center;
+}
+
+.slide-container {
+  align-items: center;
+  background-color: #0f172a; /* Slate-900 */
+  border-radius: 8px;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  font-family: 'Inter', sans-serif;
+  height: 720px;
+  justify-content: center;
+  overflow: hidden;
+  padding: 60px;
+  position: relative;
+  width: 1280px;
+}
+
+/* 1.1 BACKGROUND STYLING */
+
+.slide-container::before {
+  content: '';
+  height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+  z-index: 0;
+  background: radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
+              radial-gradient(circle at 0% 0%, rgba(168, 85, 247, 0.1) 0%, transparent 50%);
+}
+
+.slide-container>* {
+  position: relative;
+  z-index: 1;
+}
+
+/* 2. CONSISTENT TYPOGRAPHY */
+
+/* Headings Font */
+
+.slide-container h1,
+.slide-container h2,
+.slide-container h3 {
+  color: #f8fafc;
+  font-weight: 700;
+  font-family: 'Poppins', sans-serif;
+  margin: 0;
+}
+
+/* Body Text Font */
+
+.slide-container p,
+.slide-container li,
+.slide-container .subtitle,
+.slide-container .number-label,
+.slide-container .legend li,
+.slide-container .chart-summary,
+.slide-container .bar .label,
+.slide-container th,
+.slide-container td,
+.slide-container .alternating-text-tile p,
+.slide-container .bleed-text-side p {
+  color: #cbd5e1; /* Slate-300 */
+  font-family: 'Inter', sans-serif;
+}
+
+/* Consistent Font Sizes */
+
+.slide-container h1 {
+  font-size: 70px;
+  color: #06b6d4; /* Cyan-500 */
+  text-align: center;
+}
+
+.slide-container .slide-title {
+  /* This is an h2 */
+  font-size: 40px;
+  font-weight: 600;
+  margin-bottom: 40px;
+  text-align: left;
+  width: 100%;
+  color: #06b6d4; /* Cyan-500 */
+}
+
+.slide-container h3 {
+  font-size: 32px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #a855f7; /* Purple-500 */
+}
+
+/* Unified body text size */
+
+.slide-container p,
+.slide-container li,
+.slide-container .subtitle,
+.slide-container .legend li,
+.slide-container .chart-summary,
+.slide-container .bar .label,
+.slide-container th,
+.slide-container td,
+.slide-container .alternating-text-tile p,
+.slide-container .bleed-text-side p {
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.slide-container .subtitle {
+  font-weight: 400;
+  margin: 20px auto;
+  font-size: 24px;
+}
+
+.slide-container .content-area {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  justify-content: center;
+  width: 100%;
+}
+
+/* 3. LAYOUT DEFINITIONS */
+
+.title-layout {
+  text-align: center;
+}
+
+.two-column {
+  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 50px;
+  width: 100%;
+}
+
+.two-column.tiled {
+  align-items: stretch;
+}
+
+.two-column.tiled>div {
+  background-color: #1e293b; /* Slate-800 */
+  border-radius: 12px;
+  border: 1px solid #334155; /* Slate-700 */
+  padding: 40px;
+  text-align: center;
+}
+
+.two-column ul {
+  list-style: disc;
+  margin: 0;
+  padding-left: 25px;
+}
+
+.two-column li {
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.image-wrapper {
+  border-radius: 12px;
+  height: 400px;
+  max-width: 100%;
+  overflow: hidden;
+  width: 100%;
+  border: 1px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e293b;
+}
+
+.image-wrapper img {
+  height: 100%;
+  max-width: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.tiled-content {
+  align-items: stretch;
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  width: 100%;
+}
+
+.tile {
+  align-items: center;
+  background-color: #1e293b;
+  border-radius: 12px;
+  border: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: flex-start;
+  padding: 30px;
+  text-align: center;
+}
+
+.tile .icon {
+  color: #06b6d4;
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+.bullet-list {
+  max-width: 900px;
+  width: 100%;
+}
+
+.bullet-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bullet-list li {
+  gap: 15px;
+  margin-bottom: 25px;
+  padding-left: 50px;
+  position: relative;
+  font-size: 22px;
+}
+
+.bullet-list i {
+  color: #06b6d4;
+  font-size: 28px;
+  left: 0;
+  margin-top: 2px;
+  position: absolute;
+  text-align: center;
+  top: 0;
+}
+
+.bullet-list li strong {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.image-tile {
+  flex: 1;
+  text-align: center;
+}
+
+.image-tile .image-wrapper {
+  height: 225px;
+  margin-bottom: 20px;
+}
+
+.full-bg-image {
+  background-position: center;
+  background-size: cover;
+}
+
+.full-bg-image .content-overlay {
+  text-align: center;
+}
+
+.highlight-numbers-layout>div:first-child {
+  flex: 0 0 40%;
+  text-align: center;
+}
+
+.highlight-numbers-layout .number {
+  color: #a855f7;
+  font-size: 150px;
+  font-weight: 700;
+  font-family: 'Poppins', sans-serif;
+  line-height: 1;
+}
+
+.highlight-numbers-layout .number-label {
+  font-size: 28px;
+  font-weight: 600;
+  color: #f8fafc;
+  margin-top: 10px;
+}
+
+/* 4. CHART STYLING */
+
+.chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.bar {
+  align-items: center;
+  display: flex;
+  gap: 20px;
+}
+
+.bar .label {
+  color: #cbd5e1;
+  flex: 0 0 220px;
+  font-weight: 600;
+  text-align: right;
+  font-size: 20px;
+}
+
+.bar .bar-inner {
+  background-color: #1e293b;
+  border-radius: 8px;
+  flex-grow: 1;
+  height: 45px;
+}
+
+.bar .bar-fill {
+  align-items: center;
+  border-radius: 8px;
+  color: white;
+  display: flex;
+  font-size: 18px;
+  font-weight: 700;
+  height: 100%;
+  justify-content: flex-end;
+  padding-right: 15px;
+}
+
+.chart-summary {
+  font-style: italic;
+  margin-top: 30px;
+  max-width: 90%;
+  text-align: center;
+  font-size: 20px;
+}
+
+/* Section Title */
+
+.section-title-layout {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+}
+
+.section-title-layout h2 {
+  font-size: 60px;
+  margin-bottom: 20px;
+  color: #06b6d4;
+}
+
+.section-title-layout p {
+  font-size: 24px;
+  margin: 0 auto;
+  max-width: 700px;
+}
+
+.section-title-layout hr {
+  background-color: #a855f7;
+  border: none;
+  height: 6px;
+  margin: 30px auto;
+  width: 120px;
+  border-radius: 3px;
+}
+
+/* Timeline Layout */
+
+.timeline-layout {
+  align-items: stretch;
+  display: flex;
+  height: 100%;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+}
+
+.timeline-layout .timeline-line {
+  background-color: #334155;
+  height: 4px;
+  left: 0;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-2px);
+  width: 100%;
+  z-index: 0;
+}
+
+.timeline-item {
+  flex: 1;
+  position: relative;
+  text-align: center;
+}
+
+.timeline-item::after {
+  background-color: #1e293b;
+  border-radius: 50%;
+  border: 4px solid #06b6d4;
+  content: '';
+  height: 24px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  z-index: 1;
+}
+
+.timeline-item .content-wrapper {
+  left: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.timeline-item:nth-child(odd) .content-wrapper {
+  bottom: 50%;
+  margin-bottom: 30px;
+}
+
+.timeline-item:nth-child(even) .content-wrapper {
+  margin-top: 30px;
+  top: 50%;
+}
+
+.timeline-item h3 {
+  color: #a855f7;
+  font-size: 26px;
+  margin-bottom: 10px;
+}
+
+/* Q&A Layout */
+
+.qa-layout {
+  margin: 0 auto;
+  text-align: center;
+  width: 100%;
+  align-self: center;
+}
+
+.qa-layout h2 {
+  font-size: 80px;
+  margin-bottom: 20px;
+  color: #06b6d4;
+}
+
+.qa-layout p {
+  font-size: 26px;
+}
+
+/* Fuel Figures Grid */
+.fuel-figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+.fuel-stat {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+}
+.fuel-stat .stat-num {
+  font-size: 32px;
+  color: #06b6d4;
+  font-weight: 700;
+}
+.fuel-stat .stat-desc {
+  font-size: 16px;
+  color: #cbd5e1;
+}
+
+/* Math Formula Container */
+.formula-container {
+    text-align: center;
+    margin: 15px 0;
+    color: #06b6d4;
+    font-size: 22px;
+}
+
+/* Memetic Algorithm Array Visualization */
+.array-viz {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 20px 0;
+  width: 100%;
+}
+
+.array-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.array-label {
+  color: #06b6d4;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: right;
+  width: 130px;
+}
+
+.array-cells {
+  border: 2px solid #334155;
+  border-radius: 8px;
+  display: flex;
+  overflow: hidden;
+}
+
+.array-cell {
+  align-items: center;
+  background: #1e293b;
+  border-right: 1px solid #334155;
+  color: #f8fafc;
+  display: flex;
+  font-family: monospace;
+  font-size: 22px;
+  font-weight: bold;
+  height: 45px;
+  justify-content: center;
+  width: 45px;
+}
+
+.array-cell:last-child {
+  border-right: none;
+}
+
+.array-cell.highlight {
+  background: #3b82f6;
+}
+
+.array-cell.highlight-alt {
+  background: #a855f7;
+}
+
+.array-cell.empty {
+  background: #0f172a;
+  color: #475569;
+}
+
+.array-divider-line {
+  background: #f8fafc;
+  border-radius: 2px;
+  height: 55px;
+  margin: 0 2px;
+  width: 4px;
+}
+    </style>
+</head>
+<body>
+
+<!-- Slide 1: Title_Slide -->
+<div class="slide-container" id="slide1">
+    <div class="title-layout">
+        <h1>Optimizing the Last Mile</h1>
+        <p class="subtitle">Solving the Vehicle Routing Problem (VRP) in Modern Logistics</p>
+    </div>
+</div>
+
+<!-- Slide 2: Section_Title -->
+<div class="slide-container" id="slide2">
+    <div class="section-title-layout">
+        <hr>
+        <h2>The Challenge of Modern Logistics</h2>
+        <p>In a world demanding faster, cheaper deliveries, how do we efficiently connect the warehouse to the customer&#39;s door?</p>
+    </div>
+</div>
+
+<!-- Slide 3: Two_Column_Tiled_Text -->
+<div class="slide-container" id="slide3">
+    <h2 class="slide-title">What is the VRP?</h2>
+    <div class="content-area">
+        <div class="two-column tiled">
+            <div>
+                <h3>Goal &amp; Applications</h3>
+                <p><strong>The Goal:</strong> Design an optimal set of routes for a fleet of vehicles to serve a given set of customers, minimizing total route cost (distance, time, or fuel).</p>
+                <p><strong>Applications:</strong> Package delivery (Amazon, UPS), public transit scheduling, waste collection, and supply chain logistics.</p>
+                <div class="formula-container" style="font-size: 28px; margin-top: 25px;">
+                    $$ \min \sum_{i} \sum_{j} c_{ij} x_{ij} $$
+                </div>
+            </div>
+            <div>
+                <h3>The Complexity</h3>
+                <p>The VRP is an extension of the famous Traveling Salesperson Problem (TSP) and is classified as <strong>NP-hard</strong>. This means that as the number of delivery stops increases, the computational time required to find the absolute perfect route grows exponentially, making brute-force methods impossible for real-world scenarios.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slide 4: Tiled_Images -->
+<div class="slide-container" id="slide4">
+    <h2 class="slide-title">Real-World Impact of Optimization</h2>
+    <div class="content-area">
+        <div class="tiled-content">
+            <div class="image-tile">
+                <div class="image-wrapper" style="height: 320px; background: #fff; padding: 10px;">
+                    <img alt="Graph of carbon emission reduction" style="object-fit: contain;" src="https://www.mdpi.com/forests/forests-16-00062/article_deploy/html/images/forests-16-00062-g008.png">
+                </div>
+                <h3 style="margin-top:20px; font-size:24px; color:#f8fafc;">Emissions Reduction</h3>
+                <p>Efficient routing cuts unnecessary miles, directly reducing Scope 3 greenhouse gas emissions. Systems like UPS ORION prevent over 100,000 metric tons of CO2 annually.</p>
+            </div>
+            <div class="image-tile">
+                <div class="image-wrapper" style="height: 320px; background: #fff; padding: 10px;">
+                    <img alt="Chart showing cost savings" style="object-fit: contain;" src="https://d14rygu51fb4su.cloudfront.net/media/route-optimization-cost-savings-1.webp">
+                </div>
+                <h3 style="margin-top:20px; font-size:24px; color:#f8fafc;">Financial Savings</h3>
+                <p>Shaving just one mile off each driver&#39;s daily route can translate to roughly $50 million per year in fuel and operational cost savings for large global fleets.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slide 5: Tiled_Text_With_Icons -->
+<div class="slide-container" id="slide5">
+    <h2 class="slide-title">Key Problem Constraints</h2>
+    <div class="content-area">
+        <div class="tiled-content">
+            <div class="tile">
+                <div class="icon"><i class="fa-regular fa-clock"></i></div>
+                <h3>Time Windows</h3>
+                <p>Customers require deliveries within specific, often narrow, time frames (e.g., 10:00 AM - 12:00 PM). Missing these windows incurs heavy penalties.</p>
+            </div>
+            <div class="tile">
+                <div class="icon"><i class="fa-solid fa-truck-ramp-box"></i></div>
+                <h3>Capacity Limits</h3>
+                <p>Every vehicle has a maximum payload by weight and volume. The routing algorithm must pack effectively without overloading the truck.</p>
+            </div>
+            <div class="tile">
+                <div class="icon"><i class="fa-solid fa-traffic-light"></i></div>
+                <h3>Dynamic Traffic</h3>
+                <p>Routes must account for real-time and predictive variables like rush hour congestion, road closures, and weather events.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slide 6: Section_Title -->
+<div class="slide-container" id="slide6">
+    <div class="section-title-layout">
+        <hr>
+        <h2>Mathematical &amp; Algorithmic Approaches</h2>
+        <p>How do we actually solve an NP-hard problem in practice?</p>
+    </div>
+</div>
+
+<!-- Slide 7: Tiled_Images (UPDATED WITH SPECIFIC IMAGES) -->
+<div class="slide-container" id="slide7">
+    <h2 class="slide-title">Solving the VRP</h2>
+    <div class="content-area">
+        <div class="tiled-content">
+            <div class="image-tile">
+                <div class="image-wrapper">
+                    <img alt="Mathematical formulas and structural lines representing exact math" src="https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=600&h=400">
+                </div>
+                <h3 style="margin-top:15px; font-size:24px;">Exact Methods</h3>
+                <p>Using integer programming to find the guaranteed best solution. Only viable for very small datasets due to computational limits.</p>
+            </div>
+            <div class="image-tile">
+                <div class="image-wrapper">
+                    <img alt="Whiteboard with fast planning diagrams" src="assets/heuristic.png">
+                </div>
+                <h3 style="margin-top:15px; font-size:24px;">Heuristics</h3>
+                <p>Rule-of-thumb algorithms (like the Nearest Neighbor method) that find &#34;good enough&#34; solutions extremely quickly, prioritizing speed.</p>
+            </div>
+            <div class="image-tile">
+                <div class="image-wrapper">
+                    <img alt="Glowing digital network connections representing AI" src="assets/metaheuristic.png">
+                </div>
+                <h3 style="margin-top:15px; font-size:24px;">Metaheuristics</h3>
+                <p>Advanced frameworks like Genetic Algorithms or Simulated Annealing that iteratively improve heuristics to near-optimal results.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slide 8: Bar_Chart_For_Comparisons -->
+<div class="slide-container" id="slide8">
+    <h2 class="slide-title">Algorithm Performance Comparison</h2>
+    <div class="content-area">
+        <div class="chart-container">
+            <div class="bar">
+                <div class="label">Memetic (Ours)</div>
+                <div class="bar-inner"><div class="bar-fill" style="width: 95%; background: linear-gradient(90deg, #a855f7, #7c3aed);">58.7% Improvement (55 sec)</div></div>
+            </div>
+            <div class="bar">
+                <div class="label">Exact Methods</div>
+                <div class="bar-inner"><div class="bar-fill" style="width: 100%; background: linear-gradient(90deg, #60a5fa, #3b82f6);">100% Optimal (Hours/Days)</div></div>
+            </div>
+            <div class="bar">
+                <div class="label">Basic Heuristics</div>
+                <div class="bar-inner"><div class="bar-fill" style="width: 65%; background: linear-gradient(90deg, #facc15, #d97706);">Fast baseline (Seconds)</div></div>
+            </div>
+        </div>
+        <p class="chart-summary">Our memetic algorithm achieves a <strong style="color: #a855f7;">58.7% improvement</strong> over random initialization on a 35-customer VRP instance, using 4 of 5 available vehicles with zero capacity violations — in under one minute.</p>
+    </div>
+</div>
+
+<!-- Slide 9: Highlighted_Numbers (UPDATED WITH FIGURES) -->
+<div class="slide-container" id="slide9">
+    <h2 class="slide-title">The Cost of Inefficiency</h2>
+    <div class="content-area">
+        <div class="two-column highlight-numbers-layout" style="align-items: center;">
+            <div>
+                <div class="number" style="font-size: 130px;">15%</div>
+                <div class="number-label">Excess Fuel Burned</div>
+                <p style="margin-top: 15px; font-size: 16px; font-style: italic;">From lack of algorithmic optimization.</p>
+            </div>
+            <div>
+                <h3>The &#34;Do-Nothing&#34; Penalty</h3>
+                <p>For a regional fleet of just <strong>100 trucks</strong>, driving an inefficiently routed extra 15 miles per day yields staggering losses:</p>
+                
+                <div class="fuel-figures">
+                    <div class="fuel-stat">
+                        <div class="stat-num">~60,000</div>
+                        <div class="stat-desc">Excess Gallons of Fuel Annually</div>
+                    </div>
+                    <div class="fuel-stat">
+                        <div class="stat-num">$240,000+</div>
+                        <div class="stat-desc">Wasted Operating Capital</div>
+                    </div>
+                    <div class="fuel-stat" style="grid-column: span 2;">
+                        <div class="stat-num">600 Metric Tons</div>
+                        <div class="stat-desc">Extra CO2 Emissions Released</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Slide 10: Memetic Algorithm for VRP — Overview -->
+<div class="slide-container" id="slide10">
+    <h2 class="slide-title">Our Approach: Memetic Algorithm for VRP</h2>
+    <div class="content-area">
+        <div class="two-column">
+            <div>
+                <p style="font-size: 18px; font-weight: 600; color: #f8fafc; margin-bottom: 15px;">Genetic Algorithm + Local Search = Memetic Algorithm</p>
+                <p style="font-size: 16px; color: #a855f7; margin-bottom: 20px; font-style: italic;">Why memetic? VRP's search space is vast and rugged — the GA <strong>explores</strong> globally while local search <strong>exploits</strong> promising regions. Neither approach alone is sufficient; together they converge faster and to better solutions. (Moscato, 1989)</p>
+                <ul>
+                    <li><strong>Giant Tour Encoding:</strong> Solutions are permutations of all customers. The Prins Split algorithm partitions them into feasible multi-vehicle routes respecting capacity.</li>
+                    <li><strong>GA Operators:</strong> Tournament selection, Order Crossover (OX), and 3 mutation types (swap, inversion, displacement). Population: 60 individuals over 150 generations.</li>
+                    <li><strong>Local Search (Memetic):</strong> 15% of offspring undergo 5 refinement operators — <em>2-opt</em> and <em>Or-opt</em> (within a route), <em>Relocate</em>, <em>Exchange</em>, and <em>2-opt*</em> (between routes).</li>
+                    <li><strong>Diversity Injection:</strong> When stagnation detected (25 gens no improvement), 20% of population replaced with random tours.</li>
+                </ul>
+            </div>
+            <div>
+                <div class="image-wrapper" style="background: #1e293b; padding: 10px;">
+                    <img alt="Memetic algorithm architecture diagram" style="object-fit: contain;" src="../diagrams/architecture.png">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slide 11: Encoding & Prins Split -->
+<div class="slide-container" id="slide11">
+  <h2 class="slide-title">Encoding: Giant Tour + Prins Split</h2>
+  <div class="content-area">
+    <div class="two-column">
+      <div>
+        <p style="font-size: 18px; color: #f8fafc; margin-bottom: 20px;">We encode a solution as a <strong>giant tour</strong> — a permutation of all customers — and decode it into multiple vehicle routes using <strong>Prins' Split Algorithm</strong>.</p>
+        <ul>
+          <li><strong>Giant Tour:</strong> A shuffled list of all \( N \) customers without the depot. e.g., \( [3, 7, 1, 5, 9, 2, 8, 4, 6] \). The order determines route assignment.</li>
+          <li><strong>Prins Split:</strong> Constructs a DAG and finds the shortest-path partition of the giant tour into capacity-feasible routes. Complexity: \( O(N^2) \).</li>
+          <li><strong>Fitness:</strong> Total distance across all decoded routes, with a penalty for overcapacity:
+          <div class="formula-container" style="font-size: 16px;">
+            $$ \text{Fitness}(T) = \sum_{r \in \text{Split}(T)} \text{Dist}(r) + \lambda \cdot \max(0, \text{Load}(r) - Q) $$
+          </div>
+          </li>
+          <li><strong>Advantage:</strong> The GA operates on simple 1D permutations; all VRP complexity (routing, capacity) is handled by the split decoder.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="image-wrapper" style="background: #1e293b; padding: 5px;">
+          <img alt="Giant tour encoding and Prins split decoding diagram" style="object-fit: contain;" src="../diagrams/encoding.png">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 12: Order Crossover (OX) -->
+<div class="slide-container" id="slide12">
+  <h2 class="slide-title">Genetic Operator: Order Crossover (OX)</h2>
+  <div class="content-area">
+    <p style="margin-bottom: 25px;"><strong>OX operates on the giant tour</strong> — two parent permutations are combined to produce an offspring that inherits subsequences from both, without duplicating any customer.</p>
+        
+    <div class="array-viz">
+      <div class="array-row">
+        <div class="array-label">Parent 1:</div>
+        <div class="array-cells">
+          <div class="array-cell">1</div><div class="array-cell">2</div>
+          <div class="array-divider-line"></div>
+          <div class="array-cell highlight">3</div><div class="array-cell highlight">4</div><div class="array-cell highlight">5</div>
+          <div class="array-divider-line"></div>
+          <div class="array-cell">6</div><div class="array-cell">7</div>
+        </div>
+        <p style="margin-left: 20px; font-size: 16px; width: 250px;">1. Select a random swath from Parent 1.</p>
+      </div>
+            
+      <div class="array-row">
+        <div class="array-label">Parent 2:</div>
+        <div class="array-cells">
+          <div class="array-cell">7</div><div class="array-cell">6</div>
+          <div class="array-divider-line" style="background: transparent;"></div>
+          <div class="array-cell">5</div><div class="array-cell">4</div><div class="array-cell">3</div>
+          <div class="array-divider-line" style="background: transparent;"></div>
+          <div class="array-cell">2</div><div class="array-cell">1</div>
+        </div>
+        <p style="margin-left: 20px; font-size: 16px; width: 250px;">2. Parent 2's sequence provides the rest.</p>
+      </div>
+
+      <div class="array-row" style="margin-top: 15px;">
+        <div class="array-label" style="color: #cbd5e1;">Child (A):</div>
+        <div class="array-cells">
+          <div class="array-cell empty">-</div><div class="array-cell empty">-</div>
+          <div class="array-divider-line"></div>
+          <div class="array-cell highlight">3</div><div class="array-cell highlight">4</div><div class="array-cell highlight">5</div>
+          <div class="array-divider-line"></div>
+          <div class="array-cell empty">-</div><div class="array-cell empty">-</div>
+        </div>
+        <p style="margin-left: 20px; font-size: 16px; width: 250px;">3. Copy P1's swath exactly.</p>
+      </div>
+
+      <div class="array-row">
+        <div class="array-label" style="color: #a855f7;">Child (Final):</div>
+        <div class="array-cells">
+          <div class="array-cell highlight-alt">2</div><div class="array-cell highlight-alt">1</div>
+          <div class="array-divider-line"></div>
+          <div class="array-cell highlight">3</div><div class="array-cell highlight">4</div><div class="array-cell highlight">5</div>
+          <div class="array-divider-line"></div>
+          <div class="array-cell highlight-alt">7</div><div class="array-cell highlight-alt">6</div>
+        </div>
+        <p style="margin-left: 20px; font-size: 16px; width: 250px;">4. Fill blanks starting from right cut using P2's sequence (7,6,2,1), skipping already-used genes 3,4,5.</p>
+      </div>
+    </div>
+    <p style="margin-top: 20px; font-style: italic; text-align: center; color: #a855f7;">Child: [2, 1, 3, 4, 5, 7, 6] — inherits P1's swath [3,4,5] and P2's order for the rest.</p>
+  </div>
+</div>
+
+<!-- Slide 13: Local Search -->
+<div class="slide-container" id="slide13">
+  <h2 class="slide-title">Local Search: 5 Operators (The Memetic Core)</h2>
+  <div class="content-area">
+    <div class="two-column" style="align-items: center;">
+      <div>
+        <p style="font-size: 18px; color: #f8fafc; font-weight: 600;">Intensive refinement before survival.</p>
+        <p>Each generation, <strong>15% of offspring</strong> undergo a full local search pipeline. All operators use <strong>delta evaluation</strong> — computing only the change in cost, not recomputing the entire route. This yields a <strong>3-10x speedup</strong>.</p>
+        <ul style="margin-top: 15px;">
+          <li><strong style="color: #06b6d4;">Intra-route:</strong>
+            <ul style="margin-top: 5px; margin-bottom: 10px;">
+              <li><strong>2-opt</strong> — Reverse subtour to eliminate crossings</li>
+              <li><strong>Or-opt</strong> — Relocate a segment of 1-3 nodes</li>
+            </ul>
+          </li>
+          <li><strong style="color: #a855f7;">Inter-route:</strong>
+            <ul style="margin-top: 5px;">
+              <li><strong>Relocate</strong> — Move customer between routes</li>
+              <li><strong>Exchange</strong> — Swap two customers across routes</li>
+              <li><strong>2-opt*</strong> — Split &amp; cross-connect two routes</li>
+            </ul>
+          </li>
+          <li><strong>Pipeline:</strong> Intra-route → Relocate → Exchange → 2-opt*, repeated up to 3 cycles until no improvement.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="image-wrapper" style="background: #1e293b; padding: 5px; height: auto;">
+          <img alt="Local search operators visualization" style="object-fit: contain;" src="../diagrams/local_search.png">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 14: Iteration & Convergence -->
+<div class="slide-container" id="slide14">
+  <h2 class="slide-title">Iteration &amp; Convergence</h2>
+  <div class="content-area">
+    <div class="two-column">
+      <div>
+        <p style="font-size: 18px; font-weight: 600; color: #f8fafc;">150 generations of evolve-and-refine.</p>
+        <ol style="color: #cbd5e1; font-size: 17px; line-height: 1.5; margin-left: 20px; margin-top: 15px;">
+          <li style="margin-bottom: 10px;"><strong>Evaluate</strong> — Compute fitness for all 60 individuals via Prins Split.</li>
+          <li style="margin-bottom: 10px;"><strong>Select &amp; Breed</strong> — Tournament selection → Order Crossover → Mutation (swap, inversion, displacement).</li>
+          <li style="margin-bottom: 10px;"><strong>Local Search</strong> — 15% of offspring refined by 5 operators (intra- + inter-route).</li>
+          <li style="margin-bottom: 10px;"><strong>Elitism</strong> — Top 2 solutions preserved unchanged.</li>
+          <li style="margin-bottom: 10px;"><strong>Diversity Injection</strong> — If 25 generations pass with no improvement, 20% of population replaced by random tours.</li>
+          <li><strong>Repeat</strong> — 150 generations. Best solution across all generations is the final answer.</li>
+        </ol>
+        <div class="fuel-stat" style="margin-top: 15px; text-align: center;">
+          <div class="stat-num">58.7%</div>
+          <div class="stat-desc">Improvement in total distance</div>
+        </div>
+      </div>
+      <div>
+        <div class="image-wrapper" style="background: #1e293b; padding: 5px; border: none;">
+          <img alt="Convergence curve showing algorithm improvement" style="object-fit: contain;" src="../outputs/vrp_final.png">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 15: Results Dashboard -->
+<div class="slide-container" id="slide15">
+  <h2 class="slide-title">Results: 35-Customer Instance</h2>
+  <div class="content-area">
+    <div class="two-column" style="align-items: center;">
+      <div>
+        <h3 style="font-size: 24px; margin-bottom: 15px;">Performance Summary</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 16px;">
+          <tr style="border-bottom: 1px solid #334155;">
+            <td style="padding: 10px 15px; color: #cbd5e1;">Initial distance</td>
+            <td style="padding: 10px 15px; color: #f8fafc; font-weight: 700;">1,246 units</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #334155;">
+            <td style="padding: 10px 15px; color: #cbd5e1;">Final distance</td>
+            <td style="padding: 10px 15px; color: #06b6d4; font-weight: 700; font-size: 22px;">514 units</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #334155;">
+            <td style="padding: 10px 15px; color: #cbd5e1;">Improvement</td>
+            <td style="padding: 10px 15px; color: #3cb44b; font-weight: 700; font-size: 22px;">58.7%</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #334155;">
+            <td style="padding: 10px 15px; color: #cbd5e1;">Routes used</td>
+            <td style="padding: 10px 15px; color: #f8fafc;">4 / 5 available</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #334155;">
+            <td style="padding: 10px 15px; color: #cbd5e1;">Capacity violations</td>
+            <td style="padding: 10px 15px; color: #3cb44b; font-weight: 600;">None</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 15px; color: #cbd5e1;">Computation time</td>
+            <td style="padding: 10px 15px; color: #f8fafc;">~55 seconds</td>
+          </tr>
+        </table>
+        <div class="fuel-stat" style="margin-top: 15px; text-align: center;">
+          <div class="stat-desc">Population: 60 &nbsp;|&nbsp; Generations: 150 &nbsp;|&nbsp; LS Intensity: 15%</div>
+        </div>
+      </div>
+      <div>
+        <div class="image-wrapper" style="background: #1e293b; padding: 5px; height: auto;">
+          <img alt="VRP solution route map" style="object-fit: contain; border-radius: 8px;" src="../outputs/vrp_final.png">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 16: Key Innovations -->
+<div class="slide-container" id="slide16">
+  <h2 class="slide-title">Key Technical Innovations</h2>
+  <div class="content-area">
+    <div class="bullet-list">
+      <ul>
+        <li><i class="fa-solid fa-bolt"></i> <strong>Delta Evaluation:</strong> Local search operators compute only the marginal change in cost \( \Delta = \text{new} - \text{old} \), not full route recomputation. Yields a <strong>3-10x speedup</strong>, reducing runtime from 162s to 55s.</li>
+        <li><i class="fa-solid fa-scale-balanced"></i> <strong>Adaptive Penalty:</strong> Capacity violation penalty increases linearly with generation number (\( 1000 + 5g \)). Early generations tolerate exploration of infeasible regions; later generations enforce strict feasibility.</li>
+        <li><i class="fa-solid fa-shuffle"></i> <strong>Diversity Injection:</strong> Stagnation detection triggers random population refresh. If no improvement for 25 generations, 20% of the population is replaced with completely random giant tours — preventing premature convergence.</li>
+        <li><i class="fa-solid fa-diagram-project"></i> <strong>Prins Split Decoding:</strong> Elegant separation of concerns — GA operates on simple 1D permutations; all routing complexity (multi-vehicle assignment, capacity feasibility) is handled by the \( O(N^2) \) split decoder.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 17: Emerging Solutions -->
+<div class="slide-container" id="slide17">
+    <h2 class="slide-title">Emerging VRP Solutions</h2>
+    <div class="content-area">
+        <div class="bullet-list">
+            <ul>
+                <li><i class="fa-solid fa-brain"></i> <strong>AI &amp; Machine Learning Prediction:</strong> Instead of static routing, AI models predict localized traffic patterns, weather delays, and even parking availability before dispatching the driver.</li>
+                <li><i class="fa-solid fa-route"></i> <strong>Dynamic Re-Routing:</strong> Optimization is moving from overnight batch processing to real-time adjustments, recalculating the entire remaining route on the fly as new orders or delays occur.</li>
+                <li><i class="fa-solid fa-plane-up"></i> <strong>Drone &amp; Autonomous Integration:</strong> The &#34;VRP with Drones&#34; (VRP-D) is a new frontier where algorithms orchestrate delivery trucks launching and retrieving drones to serve rural endpoints simultaneously.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Slide 18: Why VRP Remains an Open Challenge -->
+<div class="slide-container" id="slide18">
+    <h2 class="slide-title">Why VRP Remains an Open Challenge</h2>
+    <div class="content-area">
+        <div class="two-column tiled">
+            <div>
+                <h3>1. The Illusion of Perfection</h3>
+                <p>Because the classic VRP is NP-hard, calculating the absolute perfect route for massive global delivery fleets would take an impossible amount of computing time. The mathematical problem is never &#34;solved&#34;—operations researchers are perpetually hunting for novel algorithms that can yield near-optimal routes faster and with less compute power.</p>
+            </div>
+            <div>
+                <h3>2. Expanding Modern Variables</h3>
+                <p>The real world refuses to stay static. Researchers aren&#39;t just solving basic routes anymore; they are actively developing novel solutions for highly complex modern variants. This includes integrating Electric Vehicle Routing (E-VRP) with specific charging constraints, multi-modal drone operations, and split-second live fleet recalculations.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slide 19: Timeline -->
+<div class="slide-container" id="slide19">
+    <h2 class="slide-title">The Evolution of Routing</h2>
+    <div class="content-area">
+        <div class="timeline-layout">
+            <div class="timeline-line"></div>
+            <div class="timeline-item">
+                <div class="content-wrapper">
+                    <h3>1930s</h3>
+                    <p>The mathematical formulation of the classic Traveling Salesperson Problem.</p>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="content-wrapper">
+                    <h3>1959</h3>
+                    <p>Dantzig and Ramser publish the first official paper defining the &#34;Truck Dispatching Problem&#34; (VRP).</p>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="content-wrapper">
+                    <h3>1980s - 90s</h3>
+                    <p>Computing power increases, ushering in the era of Heuristics to solve larger datasets.</p>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="content-wrapper">
+                    <h3>1989</h3>
+                    <p>Moscato introduces Memetic Algorithms, combining evolutionary search with local refinement.</p>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="content-wrapper">
+                    <h3>2004</h3>
+                    <p>Prins proposes the Giant Tour + Split encoding for evolutionary VRP solutions.</p>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="content-wrapper">
+                    <h3>Today</h3>
+                    <p>Cloud-scale computing, real-time data, and ML redefine dynamic fleet management.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slide 20: Q&A -->
+<div class="slide-container" id="slide20">
+    <div class="qa-layout">
+        <h2>Questions?</h2>
+        <p>Thank you for exploring the math behind the last mile.</p>
+    </div>
+</div>
+
+</body></html>
